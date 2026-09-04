@@ -19,6 +19,7 @@
       overflow: hidden;
       font-family: system-ui, -apple-system, sans-serif;
     }
+
     header, nav { flex-shrink: 0; }
     main {
       flex: 1;
@@ -30,9 +31,13 @@
       gap: 10px;
       -webkit-overflow-scrolling: touch;
     }
+
     main::-webkit-scrollbar { display: none; }
 
     .weather-row {
+      position: absolute;
+      top: 50%;
+      transform: translate(0, -50%);
       display: flex;
       flex-direction: row;
       gap: 15px;
@@ -42,6 +47,7 @@
       padding: 5px;
       scrollbar-width: none;
     }
+
     .weather-row::-webkit-scrollbar { display: none; }
 
     .weather-card {
@@ -49,29 +55,34 @@
       width: 140px;
       text-align: center;
     }
+
     .weather-icon {
       display: flex;
       justify-content: center;
       align-items: center;
       width: 100%;
-      height: 100px;
+      height: 200px;
     }
+
     .weather-icon svg {
       width: 50%;
       height: 50%;
       transform: scale(3);
     }
+
     .weather-icon path {
       fill: none;
       stroke: #1c3e60;
       stroke-width: 1;
       transition: 0.3s ease;
     }
+
     .weather-icon:hover path {
       stroke-dasharray: 50;
       stroke-dashoffset: 200;
       animation: strokeEffect 2s linear infinite;
     }
+    
     @keyframes strokeEffect {
       to {
         stroke-dasharray: 200;
