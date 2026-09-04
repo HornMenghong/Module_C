@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header,nav {
+      flex-shrink: 0;
+    }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      align-items: center;
+      justify-content: start;
+      flex-direction: column;
+      min-height: calc(100% - 126px);
+      padding: 10px;
+      scrollbar-width: none;
+    }
+
+    .row {
+      display: flex;
+      flex-direction: row !important;
+      gap: 20px;
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      overflow-y: hidden;
+      width: 100%;           
+      height: 100%;  
+      box-sizing: border-box;
+      scrollbar-width: none;
+    }
+
+    .weather-icon {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: inherit;
+      height: inherit;
+    }
+
+    .weather-icon svg{
+      width: 50%;
+      height: 50%;
+      scale: 3;
+    }
+
+    .weather-icon path {
+      fill: none;
+      stroke: #1c3e60;
+      stroke-width: 1;
+      transition: 0.3s ease;
+    }
+
+    .weather-icon:hover path {
+      stroke-dasharray: 50;
+      stroke-dashoffset: 200;
+      animation: strokeEffect 2s linear infinite;
+    }
+
+    @keyframes strokeEffect {
+      to {
+        stroke-dasharray: 200;
+        stroke-dashoffset: 0;
+      }
+    }
+
+    .modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(50%, 17.5%);
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+  </style>
+  <link rel="stylesheet" href="./bootstrap.css">
+  <title>Lyon Web Servicess</title>
+</head>
+<body class="bg-light">
+  <header class="d-flex justify-content-between align-items-center p-2 bg-primary text-white">
+    <h1 id="header-title">Mobile Web Service</h1>
+  </header>
+
+  <div id="modal" class="card d-flex justify-content-center align-items-center p-2 w-50 h-75 gap-4 d-none modal">
+  </div>
+  <main id="content" class="container">
+    
+  </main>
+
+  <nav class="d-flex justify-content-between align-items-center p-2 bg-primary text-white">
+    <button id="nav-btn" class="btn btn-primary" onclick="renderCarparks()">Carparks</button>
+    <button id="nav-btn" class="btn btn-primary" onclick="renderEvents()">Event</button>
+    <button id="nav-btn" class="btn btn-primary" onclick="renderWeathers()">Weather</button>
+    <button id="nav-btn" class="btn btn-primary" onclick="renderTravels()">Travel Planner</button>
+    <button id="nav-btn" class="btn btn-primary" onclick="createModal()">Settings</button>
+  </nav>
+
+
+  <script src="./geolocation_distance.js"></script>
+  <script>
+    const title = document.querySelector('#header-title');
+    const content = document.querySelector('#content');
+    const BASEURL = '/module_d_api.php/'
+    async function fetchData(endpoint) {
+      try {
+        const response = await fetch(BASEURL + endpoint);
+        const data = await response.json();
+        // console.log(data);
+        return data;
+      } catch(e) {
+        console.error(`Error: ${e}`);
+      }
+    }
+
+    async function init() {
+      carparks = await fetchData('carparks.json');
+    }
+
+    init();
+
+    // Carparks
+    let carparks = null;
+
+    function getPinnedCarparks() {
+      return JSON.parse(localStorage.getItem("pinnedCarparks")) || [];
+    }
+
+    function savePinnedCarparks(pins) {
+      localStorage.setItem("pinnedCarparks", JSON.stringify(pins));
+    }
+
+    function togglePin(name) {
+      let pinned = getPinnedCarparks();
+
+      if (pinned.includes(name)) {
+        pinned = pinned.filter(n => n !== name);
+      } else {
+        pinned.push(name);
+      }
+
+      savePinnedCarparks(pinned);
+      renderCarparks();
+    }
+
+    const userLatitude = 45.755051;
+    const userLongitude = 4.86358;
+
+    async function viewCarpark(id) {
+      // const carparks = await fetchData('carparks.json');
+      const carpark = carparks[id];
+      const distances = getDistanceFromLatLonInKm(
+        userLatitude, userLongitude, carpark.latitude, carpark.longitude
+      );
+
+      content.innerHTML = `
+        <button class="btn btn-primary" onclick="renderCarparks()">Back</button>
+        <div class="card p-2 bg-white w-75 my-2">
+          <p class="fw-bold">${id}</p>
+          <p>Distances: ${distances.toFixed(2)}km</p>
+          <p>Available: ${carpark.availableSpaces}</p>
+        </div>
+      `;
+    }
+
+    async function renderCarparks(sortedCarparks = Object.entries(carparks)) {
+      title.innerHTML = "Carpark";
+      content.innerHTML = "";
+      sortedCarparks = applyPinnedPriority(sortedCarparks);
+      const pinned = getPinnedCarparks();
+
+      sortedCarparks.forEach(([name, details]) => {
+        const isPinned = pinned.includes(name);
+        const eventElement = document.createElement('div');
+        eventElement.className = "card p-2 bg-white w-75 my-2";
+        eventElement.innerHTML = `
+          <p class="fw-bold">${name}</p>
+          <p>Available: ${details.availableSpaces}</p>
+          <p>Location: ${details.location}</p>
+          <button class="btn btn-primary" 
+          onclick="viewCarpark('${name}')">View</button>
+          <button class="btn ${isPinned ? 'btn-danger' : 'btn-success'}"
+            onclick="togglePin('${name}')">
+            ${isPinned ? 'Unpin' : 'Pin'}
+          </button>
+        `;
+
+        content.append(eventElement);
+      });
+    }
+
+    async function sortCarparks(method) {
+      let sortedCarparks = null;
+      const reverse = method.endsWith("-reverse") ? -1 : 1;
+
+      if (method.startsWith("alpha")) {
+        sortedCarparks = Object.entries(carparks)
+          .sort((a, b) => reverse * a[0].localeCompare(b[0]));
+      }
+      if(method.startsWith("distance")) {
+        sortedCarparks = Object.entries(carparks)
+          .sort((a, b) => {
+            const dist1 = getDistanceFromLatLonInKm(userLatitude, userLongitude, a[1].latitude, a[1].longitude);
+            const dist2 = getDistanceFromLatLonInKm(userLatitude, userLongitude, b[1].latitude, b[1].longitude);
+            return reverse * (dist1 - dist2);
+          });
+      }
+
+      sortedCarparks = applyPinnedPriority(sortedCarparks);
+      renderCarparks(sortedCarparks);
+    }
+
+    function applyPinnedPriority(sortedCarparks) {
+      const pinned = getPinnedCarparks();
+
+      return [...sortedCarparks].sort((a, b) => {
+        const aPinned = pinned.includes(a[0]);
+        const bPinned = pinned.includes(b[0]);
+        return bPinned - aPinned;
+      });
+    }
+
+
+
+    // Events
+
+    async function renderEvents() {
+      title.innerHTML = "Lyon Events";
+      content.innerHTML = "";
+      content.innerHTML = `
+        <div>
+          <label>Start Date</label>
+          <input id="start" type="date"/>
+          <label>End Date</label>  
+          <input id="end" type="date"/>
+          <button class="btn btn-secondary" onclick="sortEvents()">Sort</button>  
+        </div>
+      `;
+
+      const paginatedEvents = await fetchData('events.json');
+      const events = paginatedEvents.events;
+
+      events.forEach(event => {
+        const eventElement = document.createElement('div');
+        eventElement.className = "card p-2 bg-white w-75 my-2";
+        eventElement.innerHTML = `
+          <img src="${event.image}" alt="no image">
+          <p class="fw-bold">${event.title}</p>
+          <p>Date: ${event.date}</p>
+        `;
+
+        content.append(eventElement);
+      });
+    }
+
+    async function sortEvents() {
+      const START = document.querySelector('#start').value;
+      const END = document.querySelector('#end').value;
+
+      if(!START && !END) return;
+      isSorted = true;
+
+      title.innerHTML = "Lyon Events";
+      content.innerHTML = `
+        <div>
+          <label>Start Date</label>
+          <input id="start" type="date" value="${START}"/>
+          <label>End Date</label>  
+          <input id="end" type="date" value="${END}"/>
+          <button class="btn btn-secondary" onclick="sortEvents()">Sort</button>  
+        </div>
+      `;
+      const paginatedEvents = await fetchData(`events.json?beginning_date=${START}&ending_date=${END}`);
+      const events = paginatedEvents.events;
+      events.forEach(event => {
+        const eventElement = document.createElement('div');
+        eventElement.className = "card p-2 bg-white w-75 my-2";
+        eventElement.innerHTML = `
+          <img src="${event.image}" alt="no image">
+          <p class="fw-bold">${event.title}</p>
+          <p>Date: ${event.date}</p>
+        `;
+
+        content.append(eventElement);
+      });
+    }
+
+    // Infinite Scroll
+    
+    let currentPage = 1;
+    let infiteScroll = false;
+    let isSorted = false;
+
+    content.addEventListener('scroll',()=>{
+      if (infiteScroll && !isSorted) {
+        if(content.scrollTop + content.clientHeight >= content.scrollHeight - 100 ){
+          loadMore();
+        }
+      }
+    })
+
+    async function loadMore() {
+      currentPage++;
+      console.log(currentPage);
+      const {events} = await fetchData(`events.json?page=${currentPage}`);
+
+      events.forEach(event => {
+        const eventElement = document.createElement('div');
+        eventElement.className = "card p-2 bg-white w-75 my-2";
+        eventElement.innerHTML = `
+          <img src="${event.image}" alt="no image">
+          <p class="fw-bold">${event.title}</p>
+          <p>Date: ${event.date}</p>
+        `;
+
+        content.append(eventElement);
+      });
+    }
+
+
+
+    // Weathers
+
+    async function renderWeathers() {
+      title.innerHTML = "Weather";
+      content.innerHTML = "";
+      
+      const rowElement = document.createElement('div');
+      rowElement.className = "row"; 
+
+      const weathers = await fetchData('weather.json');
+      weathers.forEach(weather => {
+      const weatherElement = document.createElement('div');
+
+      weatherElement.className = "card p-2 bg-white my-2 w-75 flex-shrink-0 d-flex justify-content-center align-items-center";
+        weatherElement.innerHTML = `
+          <p>${weather.date}</p>
+          <div class="weather-icon"></div>
+          <p>${weather.lower_temperature} - ${weather.upper_temperature}<sup>o</sup>C</p>
+          <p class="fw-bold">${weather.status}</p>
+        `;
+
+        const iconContainer = weatherElement.querySelector('.weather-icon');
+
+        fetch(`./svn_icons/${weather.status}.svg`)
+          .then(res => res.text())
+          .then(svg => {
+            iconContainer.innerHTML = svg;
+          });
+
+        rowElement.append(weatherElement);
+      });
+
+      rowElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        rowElement.scrollLeft += e.deltaY;
+      }, { passive: false });
+
+      content.append(rowElement);
+    }
+
+    async function renderTravels() {
+      title.innerHTML = "Travel Plan";
+      content.innerHTML = `
+        <button class="btn btn-secondary" onclick="createModal()">+</button>
+      `;
+      const plans = JSON.parse(localStorage.getItem('plans')) || [];
+      plans.forEach(plan => {
+        const item = document.createElement('div');
+        item.classList = "m-2 card bg-white w-50";
+        item.innerHTML = `
+          <p>${plan.startDate}</p>
+          <div class="d-flex gap-2 w-50 justify-content-start">
+            <img src="${plan.image}" width="300" height="150" style="object-fit:cover;">
+            <div>
+              <p>${plan.title}</p>  
+              <p>${plan.place}</p>  
+              <p>${plan.time}</p>  
+            <div>
+          </div>
+        `;
+        content.append(item);
+      })
+    }
+
+    const plans = JSON.parse(localStorage.getItem('plans')) || [];
+
+    function addTravel() {
+      const plans = JSON.parse(localStorage.getItem('plans')) || [];
+      const title = document.getElementById('title').value.trim();
+      const place = document.getElementById('place').value.trim();
+      const time = document.getElementById('time').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value || null;
+
+      const imageInput = document.getElementById("travelImage");
+      const file = imageInput.files[0];
+
+      const reader = new FileReader();
+      reader.onload = function () {
+        const newPlan = {
+          id: crypto.randomUUID(),
+          isPinned: false,
+          startDate, title, place, time,
+          image: reader.result // base64 image
+        };
+
+        const plans = JSON.parse(localStorage.getItem("plans")) || [];
+        if (!title|| !place || !startDate) {
+          alert("Please fill in all required fields.");
+          return;
+        }
+        plans.push(newPlan);
+
+        localStorage.setItem("plans", JSON.stringify(plans));
+        closeModal();
+        renderTravels();
+      };
+
+      if (file) {
+        reader.readAsDataURL(file);
+      }
+    }
+
+    const navBtns = document.querySelectorAll('#nav-btn');
+    let isSetting = false;
+    navBtns.forEach(navBtn => navBtn.addEventListener('click', () => {
+      navBtn.textContent === "Event" ? infiteScroll = true : infiteScroll = false;
+      navBtn.textContent === "Settings" ? isSetting = true : isSetting = false;
+      if(navBtn.textContent === "Carparks") { modalType = "Carparks" }
+      if(navBtn.textContent === "Weather") { modalType = "Weather" }
+      if(navBtn.textContent === "Travel Planner") { modalType = "Travel" }
+    }));
+
+    const body = document.querySelector('body');
+    const modal = document.querySelector('#modal');
+    let modalType = null;
+
+    function createModal() {
+      modal.classList.remove('d-none');
+      modal.innerHTML = "";
+      modal.innerHTML = `
+        <div>
+          <p>Background</p>
+          <button onclick="setBackground('white')">White</button>
+          <button onclick="setBackground('black')">Black</button>
+          <button onclick="setBackground('system')">System</button>
+        </div>
+      `;
+      if(modalType === "Carparks") {
+        modal.innerHTML += `
+          <div>
+            <p>Sort</p>
+            <button class="btn btn-primary" onclick="sortCarparks('alpha')">A - Z</button>
+            <button class="btn btn-primary" onclick="sortCarparks('alpha-reverse')">Z - A</button>
+            <button class="btn btn-primary" onclick="sortCarparks('distance')">Closest</button>
+            <button class="btn btn-primary" onclick="sortCarparks('distance-reverse')">Farthest</button>
+            <button class="btn btn-danger" onclick="closeModal()">Close</button>
+          </div>
+        `;
+      }
+      else if(modalType === "Travel") {
+        modal.innerHTML = `
+            <label>Images</label>
+            <input type="file" id="travelImage" accept="image/*" required/>
+            
+            <input id="title" type="text" placeholder="Title" required class="w-100 my-1"/>
+            <input id="place" type="text" placeholder="Place" required class="w-100 my-1"/>
+            <input id="time" type="time" placeholder="Time" required class="w-100 my-1"/>
+            
+            <div class="my-2">
+              <label class="me-2"><input type="radio" name="dayType" value="single" checked onclick="toggleDateFields('single')"> Single Day</label>
+              <label><input type="radio" name="dayType" value="multiple" onclick="toggleDateFields('multiple')"> Multiple Days</label>
+            </div>
+
+            <div id="dateContainer" class="my-1">
+              <input id="startDate" type="date" required class="w-100"/>
+              <input id="endDate" type="date" required class="w-100 d-none"/>
+            </div>
+
+            <div class="d-flex justify-content-between w-100 mt-2">
+              <button class="btn btn-success" onclick='addTravel()'>Add</button>
+              <button class="btn btn-danger" onclick="closeModal()">Close</button>
+            </div>
+        `;
+      }
+      else {
+        modal.innerHTML += `<button class="btn btn-danger" onclick="closeModal()">Close</button>`;
+      }
+
+      body.append(modal);
+    }
+
+    function closeModal() {
+      modal.classList.add('d-none');
+    }
+
+    function toggleDateFields(type) {
+      const container = document.getElementById('dateContainer');
+      const endDate = document.getElementById('endDate');
+      if (type === 'single') {
+        endDate.classList.add("d-none");
+      } else {
+        endDate.classList.remove("d-none");
+      }
+    }
+
+    function setBackground(mode) {
+      if (mode === "white") {
+        body.className = "bg-light";
+        document.body.style.color = "black";
+      }
+
+      if (mode === "black") {
+        body.className = "bg-black";
+        document.body.style.color = "white";
+      }
+
+      if (mode === "system") {
+        const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+        body.className = isDark ? "black" : "white";
+        document.body.style.color = isDark ? "white" : "black";
+      }
+    }
+
+  </script>
+</body>
+</html>

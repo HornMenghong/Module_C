@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="02d02cb1-d1c2-49aa-8f64-a0bea0f7f69f" name="ws01">
+        <fileTransfer accessType="SFTP" host="sftp.worldskills.org" port="20001" sshConfigId="b04051a0-7416-47c3-b2f6-5e4a7c0f46e3" sshConfig="ws01@sftp.worldskills.org:20001 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
