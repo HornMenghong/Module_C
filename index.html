@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,7 +9,10 @@
   <link rel="stylesheet" href="./bootstrap.css">
   <title>Lyon Web Services</title>
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       padding: 0;
@@ -20,7 +24,11 @@
       font-family: system-ui, -apple-system, sans-serif;
     }
 
-    header, nav { flex-shrink: 0; }
+    header,
+    nav {
+      flex-shrink: 0;
+    }
+
     main {
       flex: 1;
       overflow-y: auto;
@@ -32,7 +40,9 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    main::-webkit-scrollbar { display: none; }
+    main::-webkit-scrollbar {
+      display: none;
+    }
 
     .weather-row {
       position: absolute;
@@ -46,14 +56,19 @@
       width: 100%;
       padding: 5px;
       scrollbar-width: none;
+      scroll-snap-type: x proximity;
+      scroll-behavior: smooth;
     }
 
-    .weather-row::-webkit-scrollbar { display: none; }
+    .weather-row::-webkit-scrollbar {
+      display: none;
+    }
 
     .weather-card {
       flex: 0 0 auto;
       width: 140px;
       text-align: center;
+      scroll-snap-align: center;
     }
 
     .weather-icon {
@@ -82,7 +97,7 @@
       stroke-dashoffset: 200;
       animation: strokeEffect 2s linear infinite;
     }
-    
+
     @keyframes strokeEffect {
       to {
         stroke-dasharray: 200;
@@ -90,13 +105,18 @@
       }
     }
 
-    .card { width: 95%; max-width: 500px; }
+    .card {
+      width: 95%;
+      max-width: 500px;
+    }
+
     .event-img {
       width: 100%;
       height: 180px;
       object-fit: cover;
       border-radius: 4px;
     }
+
     .travel-img {
       width: 100px;
       height: 100px;
@@ -111,21 +131,35 @@
       padding: 20px;
       width: 90%;
       max-width: 400px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     }
-    dialog::backdrop { background: rgba(0,0,0,0.5); }
 
-    .pin-btn { min-width: 70px; }
-    .form-group { margin-bottom: 12px; }
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .pin-btn {
+      min-width: 70px;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
     .form-control {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
     }
-    .nav-btn.active { opacity: 0.8; font-weight: bold; }
+
+    .nav-btn.active {
+      opacity: 0.8;
+      font-weight: bold;
+    }
   </style>
 </head>
+
 <body class="bg-light">
 
   <header class="d-flex justify-content-between align-items-center p-2 bg-primary text-white">
@@ -176,7 +210,8 @@
       <input id="time" type="time" class="form-control">
     </div>
     <div class="form-group">
-      <label class="me-3"><input type="radio" name="dayType" value="single" checked onchange="toggleEndDate()"> Single Day</label>
+      <label class="me-3"><input type="radio" name="dayType" value="single" checked onchange="toggleEndDate()"> Single
+        Day</label>
       <label><input type="radio" name="dayType" value="multiple" onchange="toggleEndDate()"> Multiple Days</label>
     </div>
     <div class="form-group">
@@ -195,9 +230,36 @@
       eventsPage: 1,
       infiniteScroll: false,
       isSorted: false,
-      userLat: 45.755051,
-      userLng: 4.86358
+      carparkSort: null,
+      editPlanId: null,
+      // userLat: 45.755051,
+      // userLng: 4.86358
+      userLat: null,
+      userLng: null
     };
+
+    function getLocation() {
+      const params = new URLSearchParams(window.location.search);
+
+      const latitude = params.get('latitude');
+      const longitude = params.get('longitude');
+
+      if (latitude && longitude) {
+        state.userLat = parseFloat(latitude);
+        state.userLng = parseFloat(longitude);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          state.userLat = position.coords.latitude;
+          state.userLng = position.coords.longitude;
+        },
+        error => {
+          console.log('Geolocation error:', error);
+        }
+      );
+    }
 
     const title = document.getElementById('header-title');
     const content = document.getElementById('content');
@@ -218,8 +280,11 @@
     }
 
     async function init() {
+      getLocation();
+
       state.carparks = await fetchData('carparks.json');
       state.weatherData = await fetchData('weather.json');
+
       restoreView();
     }
 
@@ -272,7 +337,7 @@
         const view = btn.dataset.view;
         state.infiniteScroll = (view === 'events');
         state.isSorted = false;
-        switch(view) {
+        switch (view) {
           case 'carparks': renderCarparks(); break;
           case 'events': renderEvents(); break;
           case 'weather': renderWeathers(); break;
@@ -316,52 +381,77 @@
 
     function renderCarparks(sortedData) {
       if (!state.carparks) return;
+
       title.textContent = 'Carparks';
       state.currentView = 'carparks';
       saveView('carparks');
-      let items = sortedData || Object.entries(state.carparks);
+
+      let items = Object.entries(state.carparks);
+
+      if (state.carparkSort) {
+        const rev = state.carparkSort.endsWith('-reverse') ? -1 : 1;
+
+        if (state.carparkSort.startsWith('alpha')) {
+          items.sort((a, b) => rev * a[0].localeCompare(b[0]));
+        } else if (state.carparkSort.startsWith('distance')) {
+          items.sort((a, b) => {
+            const d1 = getDistanceFromLatLonInKm(
+              state.userLat,
+              state.userLng,
+              a[1].latitude,
+              a[1].longitude
+            );
+
+            const d2 = getDistanceFromLatLonInKm(
+              state.userLat,
+              state.userLng,
+              b[1].latitude,
+              b[1].longitude
+            );
+
+            return rev * (d1 - d2);
+          });
+        }
+      }
+
       items = applyPinned(items);
+
       const pinned = getPinned();
 
-      content.innerHTML = `
-        <div class="w-100 d-flex justify-content-center mb-2">
-          <button class="btn btn-secondary btn-sm" onclick="openModalFromTemplate('carpark-sort-template')">Sort & Filter</button>
-        </div>
-      `;
+      content.innerHTML = '';
+
       items.forEach(([name, d]) => {
         const isPinned = pinned.includes(name);
+
         const el = document.createElement('div');
         el.className = 'card p-3 bg-white mb-2';
+
         el.innerHTML = `
-          <div class="d-flex justify-content-between align-items-start">
-            <h6 class="fw-bold mb-1">${name}</h6>
-            <button class="btn btn-sm ${isPinned ? 'btn-danger' : 'btn-outline-success'} pin-btn"
-              onclick="togglePin('${name}')">${isPinned ? 'Unpin' : 'Pin'}</button>
-          </div>
-          <p class="mb-1">Available: ${d.availableSpaces}</p>
-          <p class="mb-2 text-muted small">${d.location}</p>
-          <button class="btn btn-primary btn-sm" onclick="viewCarpark('${name}')">View Details</button>
-        `;
+      <div class="d-flex justify-content-between align-items-start">
+        <h6 class="fw-bold mb-1">${name}</h6>
+        <button class="btn btn-sm ${isPinned ? 'btn-danger' : 'btn-outline-success'} pin-btn"
+          onclick="togglePin('${name}')">
+          ${isPinned ? 'Unpin' : 'Pin'}
+        </button>
+      </div>
+
+      <p class="mb-1">Available: ${d.availableSpaces}</p>
+      <p class="mb-2 text-muted small">${d.location}</p>
+
+      <button class="btn btn-primary btn-sm w-100"
+        onclick="viewCarpark('${name}')">
+        View Details
+      </button>
+    `;
+
         content.appendChild(el);
       });
     }
 
     function sortCarparks(method) {
-      if (!state.carparks) return;
-      const rev = method.endsWith('-reverse') ? -1 : 1;
-      let sorted = Object.entries(state.carparks);
-      if (method.startsWith('alpha')) {
-        sorted.sort((a, b) => rev * a[0].localeCompare(b[0]));
-      } else if (method.startsWith('distance')) {
-        sorted.sort((a, b) => {
-          const d1 = getDistanceFromLatLonInKm(state.userLat, state.userLng, a[1].latitude, a[1].longitude);
-          const d2 = getDistanceFromLatLonInKm(state.userLat, state.userLng, b[1].latitude, b[1].longitude);
-          return rev * (d1 - d2);
-        });
-      }
+      state.carparkSort = method;
       closeModal();
-      renderCarparks(sorted);
-    }
+    };
 
     // Events
     async function renderEvents() {
@@ -494,12 +584,17 @@
         try {
           const res = await fetch(`./svn_icons/${w.status}.svg`);
           if (res.ok) iconContainer.innerHTML = await res.text();
-        } catch {}
+        } catch { }
       }
 
       row.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        row.scrollLeft += e.deltaY;
+        if (e.deltaY !== 0) {
+          e.preventDefault();
+          row.scrollBy({
+            left: e.deltaY,
+            behavior: 'smooth'
+          });
+        }
       }, { passive: false });
 
       content.appendChild(row);
@@ -510,31 +605,124 @@
       title.textContent = 'Travel Planner';
       state.currentView = 'travel';
       saveView('travel');
+
       const plans = getPlans();
+
       content.innerHTML = `
         <div class="w-100 d-flex justify-content-center mb-2">
-          <button class="btn btn-secondary" onclick="openModalFromTemplate('travel-form-template')">+ Add Plan</button>
+          <button class="btn btn-secondary" onclick="openModalFromTemplate('travel-form-template')">
+            + Add Plan
+          </button>
         </div>
       `;
+
+      plans.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
       if (!plans.length) {
-        content.innerHTML += `<p class="text-muted">No travel plans yet.</p>`; return;
+        content.innerHTML += `<p class="text-muted">No travel plans yet.</p>`;
+        return;
       }
+
       plans.forEach(p => {
         const el = document.createElement('div');
+
         el.className = 'card p-3 bg-white mb-2 w-100';
+
         el.innerHTML = `
-          <p class="text-muted small mb-2">${p.startDate}${p.endDate ? ' - ' + p.endDate : ''}</p>
+          <p class="text-muted small mb-2">
+            ${p.startDate}${p.endDate ? ' - ' + p.endDate : ''}
+          </p>
+
           <div class="d-flex gap-3 align-items-start">
-            <img src="${p.image}" alt="" class="travel-img" onerror="this.style.display='none'">
-            <div>
-              <h6 class="fw-bold mb-1">${p.title}</h6>
-              <p class="mb-1 small">${p.place}</p>
-              <p class="mb-0 small text-muted">${p.time || ''}</p>
+            <img src="${p.image}" class="travel-img">
+
+            <div class="flex-grow-1">
+              <h6 class="fw-bold">${p.title}</h6>
+              <p class="small mb-1">${p.place}</p>
+              <p class="small text-muted">${p.time || ''}</p>
+
+              <button class="btn btn-warning btn-sm"
+                onclick="editTravel('${p.id}')">
+                Edit
+              </button>
             </div>
           </div>
         `;
         content.appendChild(el);
       });
+    }
+    function addTravel() {
+      const title = document.getElementById('title').value;
+      const place = document.getElementById('place').value;
+      const time = document.getElementById('time').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value || null;
+      const file = document.getElementById('travelImage').files[0];
+
+      if (!title || !place || !startDate) {
+        alert('Please fill in the required fields.');
+        return;
+      }
+
+      const plans = getPlans();
+
+      const save = (image) => {
+        plans.push({
+          id: crypto.randomUUID(),
+          title: title,
+          place: place,
+          time: time,
+          startDate: startDate,
+          endDate: endDate,
+          image: image
+        });
+
+        savePlans(plans);
+        closeModal();
+        renderTravels();
+      };
+
+      if (file) {
+        const reader = new FileReader();
+
+        reader.onload = function () {
+          save(reader.result);
+        };
+
+        reader.readAsDataURL(file);
+      } else {
+        save('');
+      }
+    }
+    function editTravel(id) {
+      const plans = getPlans();
+      const plan = plans.find(p => p.id === id);
+
+      openModalFromTemplate('travel-form-template');
+
+      document.getElementById('title').value = plan.title;
+      document.getElementById('place').value = plan.place;
+      document.getElementById('time').value = plan.time;
+      document.getElementById('startDate').value = plan.startDate;
+      document.getElementById('endDate').value = plan.endDate || '';
+
+      state.editPlanId = id;
+    }
+    function saveEdit() {
+      const plans = getPlans();
+
+      const plan = plans.find(p => p.id === state.editPlanId);
+
+      plan.title = document.getElementById('title').value;
+      plan.place = document.getElementById('place').value;
+      plan.time = document.getElementById('time').value;
+      plan.startDate = document.getElementById('startDate').value;
+      plan.endDate = document.getElementById('endDate').value || null;
+
+      savePlans(plans);
+      state.editPlanId = null;
+      closeModal();
+      renderTravels();
     }
 
     function toggleEndDate() {
@@ -542,28 +730,7 @@
       document.getElementById('endDate').classList.toggle('d-none', !multi);
     }
 
-    function addTravel() {
-      const title = document.getElementById('title').value.trim();
-      const place = document.getElementById('place').value.trim();
-      const time = document.getElementById('time').value;
-      const startDate = document.getElementById('startDate').value;
-      const endDate = document.getElementById('endDate').value || null;
-      const fileInput = document.getElementById('travelImage');
-      if (!title || !place || !startDate) { alert('Please fill in Title, Place and Date.'); return; }
 
-      const save = (img) => {
-        const plans = getPlans();
-        plans.push({ id: crypto.randomUUID(), title, place, time, startDate, endDate, image: img || '' });
-        savePlans(plans);
-        closeModal();
-        renderTravels();
-      };
-      if (fileInput.files[0]) {
-        const r = new FileReader();
-        r.onload = () => save(r.result);
-        r.readAsDataURL(fileInput.files[0]);
-      } else { save(''); }
-    }
 
     // Settings
     function renderSettings() {
@@ -577,8 +744,11 @@
             <button class="btn btn-outline-dark" onclick="setBg('light')">Light Mode</button>
             <button class="btn btn-dark" onclick="setBg('dark')">Dark Mode</button>
             <button class="btn btn-outline-primary" onclick="setBg('system')">System Default</button>
+            <h6>Sort Carparks</h6>
+            <button class="btn btn-success" onclick="openModalFromTemplate('carpark-sort-template')">Sort & Filter</button>
           </div>
         </div>
+        
       `;
     }
 
@@ -606,4 +776,5 @@
     init();
   </script>
 </body>
+
 </html>
