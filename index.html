@@ -179,11 +179,10 @@
   <dialog id="modal">
     <div id="modal-content"></div>
     <div class="d-flex justify-content-end mt-3">
-      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button id="modal-close-btn" class="btn btn-secondary" onclick="closeModal()">Close</button>
     </div>
   </dialog>
 
-  <!-- Dialog templates (actual HTML instead of innerHTML strings) -->
   <template id="carpark-sort-template">
     <h6>Sort Carparks</h6>
     <div class="d-grid gap-2 mt-3">
@@ -195,30 +194,45 @@
   </template>
 
   <template id="travel-form-template">
-    <h6>Add Travel Plan</h6>
+    <h2 id="travel-form-title">Add Travel Plan</h2>
+
     <div class="form-group">
       <label>Image</label>
       <input type="file" id="travelImage" accept="image/*" class="form-control">
     </div>
+
     <div class="form-group">
       <input id="title" type="text" placeholder="Title *" class="form-control" required>
     </div>
+
     <div class="form-group">
       <input id="place" type="text" placeholder="Place *" class="form-control" required>
     </div>
+
     <div class="form-group">
       <input id="time" type="time" class="form-control">
     </div>
+
     <div class="form-group">
-      <label class="me-3"><input type="radio" name="dayType" value="single" checked onchange="toggleEndDate()"> Single
-        Day</label>
-      <label><input type="radio" name="dayType" value="multiple" onchange="toggleEndDate()"> Multiple Days</label>
+      <label class="me-3">
+        <input type="radio" name="dayType" value="single" checked>
+        Single Day
+      </label>
+
+      <label>
+        <input type="radio" name="dayType" value="multiple">
+        Multiple Days
+      </label>
     </div>
+
     <div class="form-group">
       <input id="startDate" type="date" class="form-control mb-2" required>
       <input id="endDate" type="date" class="form-control d-none">
     </div>
-    <button class="btn btn-success w-100" onclick="addTravel()">Add Plan</button>
+
+    <button id="travel-save-btn" class="btn btn-success w-100">
+      Add Plan
+    </button>
   </template>
 
   <script src="./geolocation_distance.js"></script>
@@ -232,8 +246,6 @@
       isSorted: false,
       carparkSort: null,
       editPlanId: null,
-      // userLat: 45.755051,
-      // userLng: 4.86358
       userLat: null,
       userLng: null
     };
@@ -304,11 +316,14 @@
       try { return JSON.parse(localStorage.getItem('pinnedCarparks')) || []; }
       catch { return []; }
     }
+
     function savePinned(pins) { localStorage.setItem('pinnedCarparks', JSON.stringify(pins)); }
+
     function getPlans() {
       try { return JSON.parse(localStorage.getItem('plans')) || []; }
       catch { return []; }
     }
+
     function savePlans(plans) { localStorage.setItem('plans', JSON.stringify(plans)); }
 
     // Dialog helpers
@@ -316,12 +331,57 @@
       modalContent.innerHTML = html;
       modal.showModal();
     }
+
     function openModalFromTemplate(templateId) {
       modalContent.innerHTML = '';
       modalContent.appendChild(document.getElementById(templateId).content.cloneNode(true));
       modal.showModal();
     }
+
     function closeModal() { modal.close(); }
+
+    function cancelTravelDraft() {
+      localStorage.removeItem('travelDraft');
+      state.editPlanId = null;
+      modal.close();
+    }
+
+    function getTravelDraft() {
+      try {
+        return JSON.parse(localStorage.getItem('travelDraft'));
+      } catch {
+        return null;
+      }
+    }
+
+    function saveTravelDraft(draft) {
+      localStorage.setItem('travelDraft', JSON.stringify(draft));
+    }
+
+    function clearTravelDraft() {
+      localStorage.removeItem('travelDraft');
+    }
+
+    function saveTravelUIState(mode, planId = null) {
+      localStorage.setItem('travelUIState', JSON.stringify({
+        mode: mode,
+        editPlanId: planId
+      }));
+    }
+
+    function getTravelUIState() {
+      try {
+        return JSON.parse(localStorage.getItem('travelUIState'));
+      } catch {
+        return null;
+      }
+    }
+
+    function clearTravelUIState() {
+      localStorage.removeItem('travelUIState');
+    }
+
+
     modal.addEventListener('click', (e) => {
       const r = modal.getBoundingClientRect();
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
@@ -427,22 +487,22 @@
         el.className = 'card p-3 bg-white mb-2';
 
         el.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start">
-        <h6 class="fw-bold mb-1">${name}</h6>
-        <button class="btn btn-sm ${isPinned ? 'btn-danger' : 'btn-outline-success'} pin-btn"
-          onclick="togglePin('${name}')">
-          ${isPinned ? 'Unpin' : 'Pin'}
-        </button>
-      </div>
+          <div class="d-flex justify-content-between align-items-start">
+            <h6 class="fw-bold mb-1">${name}</h6>
+            <button class="btn btn-sm ${isPinned ? 'btn-danger' : 'btn-outline-success'} pin-btn"
+              onclick="togglePin('${name}')">
+              ${isPinned ? 'Unpin' : 'Pin'}
+            </button>
+          </div>
 
-      <p class="mb-1">Available: ${d.availableSpaces}</p>
-      <p class="mb-2 text-muted small">${d.location}</p>
+          <p class="mb-1">Available: ${d.availableSpaces}</p>
+          <p class="mb-2 text-muted small">${d.location}</p>
 
-      <button class="btn btn-primary btn-sm w-100"
-        onclick="viewCarpark('${name}')">
-        View Details
-      </button>
-    `;
+          <button class="btn btn-primary btn-sm w-100"
+            onclick="viewCarpark('${name}')">
+            View Details
+          </button>
+        `;
 
         content.appendChild(el);
       });
@@ -524,7 +584,6 @@
       });
     }
 
-
     async function filterEvents() {
       const s = document.getElementById('start').value;
       const e = document.getElementById('end').value;
@@ -551,8 +610,6 @@
       }
     });
 
-
-    // Weather (original behavior - no filter)
     async function renderWeathers() {
       title.textContent = 'Weather';
       state.currentView = 'weather';
@@ -610,7 +667,7 @@
 
       content.innerHTML = `
         <div class="w-100 d-flex justify-content-center mb-2">
-          <button class="btn btn-secondary" onclick="openModalFromTemplate('travel-form-template')">
+          <button class="btn btn-secondary" onclick="openTravelForm('create')">
             + Add Plan
           </button>
         </div>
@@ -626,7 +683,9 @@
       plans.forEach(p => {
         const el = document.createElement('div');
 
+        el.id = `travel-plan-${p.id}`;
         el.className = 'card p-3 bg-white mb-2 w-100';
+        el.style.marginBottom = "500px";
 
         el.innerHTML = `
           <p class="text-muted small mb-2">
@@ -650,7 +709,172 @@
         `;
         content.appendChild(el);
       });
+
+      const today = new Date().toISOString().split('T')[0];
+      const upcomingPlan = plans.find(p => p.startDate >= today);
+
+      if (upcomingPlan) {
+        const element = document.getElementById(
+          `travel-plan-${upcomingPlan.id}`
+        );
+
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      }
+
+      const uiState = getTravelUIState();
+
+      if (uiState) {
+        if (uiState.mode === 'create') {
+          openTravelForm('create');
+        }
+
+        if (uiState.mode === 'edit' && uiState.editPlanId) {
+          const plan = plans.find(p => p.id === uiState.editPlanId);
+
+          if (plan) {
+            openTravelForm('edit', plan);
+          } else {
+            clearTravelUIState();
+          }
+        }
+      }
+
     }
+
+    function openTravelForm(mode = 'create', plan = null) {
+      openModalFromTemplate('travel-form-template');
+
+      const formTitle = document.getElementById('travel-form-title');
+      const saveButton = document.getElementById('travel-save-btn');
+      const closeButton = document.getElementById('modal-close-btn');
+
+      closeButton.textContent = 'Cancel';
+      closeButton.onclick = cancelTravelDraft;
+
+      if (mode === 'edit') {
+        formTitle.textContent = 'Edit Travel Plan';
+        saveButton.textContent = 'Save Changes';
+        state.editPlanId = plan.id;
+
+        saveTravelUIState('edit', plan.id);
+      } else {
+        formTitle.textContent = 'Add Travel Plan';
+        saveButton.textContent = 'Add Plan';
+        state.editPlanId = null;
+
+        saveTravelUIState('create');
+      }
+
+      saveButton.onclick = mode === 'edit' ? saveEdit : addTravel;
+
+      document.querySelectorAll('input[name="dayType"]').forEach(radio => {
+        radio.onchange = toggleEndDate;
+      });
+
+      restoreTravelDraft(mode, plan);
+      setupTravelDraftListeners();
+    }
+
+
+
+    function restoreTravelDraft(mode, plan = null) {
+      const draft = getTravelDraft();
+
+      // Only restore a draft that belongs to the current mode/edit plan
+      if (draft && draft.mode === mode) {
+        if (mode === 'create' ||
+            (mode === 'edit' && draft.editPlanId === plan?.id)) {
+
+          document.getElementById('title').value = draft.title || '';
+          document.getElementById('place').value = draft.place || '';
+          document.getElementById('time').value = draft.time || '';
+          document.getElementById('startDate').value = draft.startDate || '';
+          document.getElementById('endDate').value = draft.endDate || '';
+
+          const dayType = draft.dayType || 'single';
+          const radio = document.querySelector(
+            `input[name="dayType"][value="${dayType}"]`
+          );
+
+          if (radio) {
+            radio.checked = true;
+          }
+
+          toggleEndDate();
+          return;
+        }
+      }
+
+      // No draft — use existing plan data for edit
+      if (mode === 'edit' && plan) {
+        document.getElementById('title').value = plan.title || '';
+        document.getElementById('place').value = plan.place || '';
+        document.getElementById('time').value = plan.time || '';
+        document.getElementById('startDate').value = plan.startDate || '';
+        document.getElementById('endDate').value = plan.endDate || '';
+
+        const dayType = plan.endDate ? 'multiple' : 'single';
+
+        const radio = document.querySelector(
+          `input[name="dayType"][value="${dayType}"]`
+        );
+
+        if (radio) {
+          radio.checked = true;
+        }
+
+        toggleEndDate();
+      }
+    }
+
+
+    function setupTravelDraftListeners() {
+      const fields = [
+        'title',
+        'place',
+        'time',
+        'startDate',
+        'endDate'
+      ];
+
+      fields.forEach(id => {
+        const input = document.getElementById(id);
+
+        input.addEventListener('input', saveCurrentTravelDraft);
+        input.addEventListener('change', saveCurrentTravelDraft);
+      });
+
+      document.querySelectorAll('input[name="dayType"]').forEach(radio => {
+        radio.addEventListener('change', saveCurrentTravelDraft);
+      });
+    }
+
+
+    function saveCurrentTravelDraft() {
+      const dayType = document.querySelector(
+        'input[name="dayType"]:checked'
+      )?.value || 'single';
+
+      const draft = {
+        mode: state.editPlanId ? 'edit' : 'create',
+        editPlanId: state.editPlanId,
+        title: document.getElementById('title').value,
+        place: document.getElementById('place').value,
+        time: document.getElementById('time').value,
+        startDate: document.getElementById('startDate').value,
+        endDate: document.getElementById('endDate').value,
+        dayType: dayType
+      };
+
+      saveTravelDraft(draft);
+    }
+
+
     function addTravel() {
       const title = document.getElementById('title').value;
       const place = document.getElementById('place').value;
@@ -669,15 +893,21 @@
       const save = (image) => {
         plans.push({
           id: crypto.randomUUID(),
-          title: title,
-          place: place,
-          time: time,
-          startDate: startDate,
-          endDate: endDate,
-          image: image
+          title,
+          place,
+          time,
+          startDate,
+          endDate,
+          image
         });
 
         savePlans(plans);
+
+        // Successful save = remove draft
+        clearTravelDraft();
+
+        state.editPlanId = null;
+
         closeModal();
         renderTravels();
       };
@@ -694,20 +924,52 @@
         save('');
       }
     }
+
+
     function editTravel(id) {
       const plans = getPlans();
       const plan = plans.find(p => p.id === id);
 
-      openModalFromTemplate('travel-form-template');
+      if (!plan) return;
 
-      document.getElementById('title').value = plan.title;
-      document.getElementById('place').value = plan.place;
-      document.getElementById('time').value = plan.time;
-      document.getElementById('startDate').value = plan.startDate;
-      document.getElementById('endDate').value = plan.endDate || '';
-
-      state.editPlanId = id;
+      openTravelForm('edit', plan);
     }
+
+
+    function saveEdit() {
+      const plans = getPlans();
+      const plan = plans.find(p => p.id === state.editPlanId);
+
+      if (!plan) return;
+
+      const title = document.getElementById('title').value;
+      const place = document.getElementById('place').value;
+      const time = document.getElementById('time').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value || null;
+
+      if (!title || !place || !startDate) {
+        alert('Please fill in the required fields.');
+        return;
+      }
+
+      plan.title = title;
+      plan.place = place;
+      plan.time = time;
+      plan.startDate = startDate;
+      plan.endDate = endDate;
+
+      savePlans(plans);
+
+      // Successful save = remove draft
+      clearTravelDraft();
+
+      state.editPlanId = null;
+
+      closeModal();
+      renderTravels();
+    }
+
     function saveEdit() {
       const plans = getPlans();
 
