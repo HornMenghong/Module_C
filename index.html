@@ -645,6 +645,10 @@
                 onclick="editTravel('${p.id}')">
                 Edit
               </button>
+              <button class="btn btn-danger btn-sm"
+              onclick="deleteTravel('${p.id}')">
+              Delete
+            </button>
             </div>
           </div>
         `;
@@ -728,6 +732,18 @@
     function toggleEndDate() {
       const multi = document.querySelector('input[name="dayType"]:checked').value === 'multiple';
       document.getElementById('endDate').classList.toggle('d-none', !multi);
+    }
+    function deleteTravel(id) {
+      if (!confirm('Are you sure you want to delete this travel plan?')) {
+        return;
+      }
+
+      let plans = getPlans();
+
+      plans = plans.filter(p => p.id !== id);
+
+      savePlans(plans);
+      renderTravels();
     }
 
 
