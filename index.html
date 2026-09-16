@@ -198,6 +198,12 @@
     <h6>Add Travel Plan</h6>
     <div class="form-group">
       <label>Image</label>
+
+      <div id="currentImageContainer" class="mb-2 d-none">
+        <img id="currentImage" class="travel-img" alt="Current travel image">
+        <p class="small text-muted mt-1 mb-0">Current image</p>
+      </div>
+
       <input type="file" id="travelImage" accept="image/*" class="form-control">
     </div>
     <div class="form-group">
@@ -218,7 +224,9 @@
       <input id="startDate" type="date" class="form-control mb-2" required>
       <input id="endDate" type="date" class="form-control d-none">
     </div>
-    <button class="btn btn-success w-100" onclick="addTravel()">Add Plan</button>
+    <button id="travelSaveBtn" class="btn btn-success w-100" onclick="addTravel()">
+      Add Plan
+    </button>
   </template>
 
   <script src="./geolocation_distance.js"></script>
@@ -232,8 +240,6 @@
       isSorted: false,
       carparkSort: null,
       editPlanId: null,
-      // userLat: 45.755051,
-      // userLng: 4.86358
       userLat: null,
       userLng: null
     };
@@ -292,6 +298,7 @@
     function saveView(view) {
       localStorage.setItem('lastView', view);
     }
+
     function restoreView() {
       const last = localStorage.getItem('lastView') || 'carparks';
       const btn = document.querySelector(`.nav-btn[data-view="${last}"]`);
@@ -304,11 +311,14 @@
       try { return JSON.parse(localStorage.getItem('pinnedCarparks')) || []; }
       catch { return []; }
     }
+
     function savePinned(pins) { localStorage.setItem('pinnedCarparks', JSON.stringify(pins)); }
+
     function getPlans() {
       try { return JSON.parse(localStorage.getItem('plans')) || []; }
       catch { return []; }
     }
+
     function savePlans(plans) { localStorage.setItem('plans', JSON.stringify(plans)); }
 
     // Dialog helpers
@@ -316,11 +326,13 @@
       modalContent.innerHTML = html;
       modal.showModal();
     }
+
     function openModalFromTemplate(templateId) {
       modalContent.innerHTML = '';
       modalContent.appendChild(document.getElementById(templateId).content.cloneNode(true));
       modal.showModal();
     }
+
     function closeModal() { modal.close(); }
     modal.addEventListener('click', (e) => {
       const r = modal.getBoundingClientRect();
@@ -427,22 +439,22 @@
         el.className = 'card p-3 bg-white mb-2';
 
         el.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start">
-        <h6 class="fw-bold mb-1">${name}</h6>
-        <button class="btn btn-sm ${isPinned ? 'btn-danger' : 'btn-outline-success'} pin-btn"
-          onclick="togglePin('${name}')">
-          ${isPinned ? 'Unpin' : 'Pin'}
-        </button>
-      </div>
+          <div class="d-flex justify-content-between align-items-start">
+            <h6 class="fw-bold mb-1">${name}</h6>
+            <button class="btn btn-sm ${isPinned ? 'btn-danger' : 'btn-outline-success'} pin-btn"
+              onclick="togglePin('${name}')">
+              ${isPinned ? 'Unpin' : 'Pin'}
+            </button>
+          </div>
 
-      <p class="mb-1">Available: ${d.availableSpaces}</p>
-      <p class="mb-2 text-muted small">${d.location}</p>
+          <p class="mb-1">Available: ${d.availableSpaces}</p>
+          <p class="mb-2 text-muted small">${d.location}</p>
 
-      <button class="btn btn-primary btn-sm w-100"
-        onclick="viewCarpark('${name}')">
-        View Details
-      </button>
-    `;
+          <button class="btn btn-primary btn-sm w-100"
+            onclick="viewCarpark('${name}')">
+            View Details
+          </button>
+        `;
 
         content.appendChild(el);
       });
@@ -524,7 +536,6 @@
       });
     }
 
-
     async function filterEvents() {
       const s = document.getElementById('start').value;
       const e = document.getElementById('end').value;
@@ -550,7 +561,6 @@
         await loadEvents(state.eventsPage, true);
       }
     });
-
 
     // Weather (original behavior - no filter)
     async function renderWeathers() {
@@ -625,7 +635,7 @@
 
       plans.forEach(p => {
         const el = document.createElement('div');
-
+        el.id = `travel-plan-${p.id}`;
         el.className = 'card p-3 bg-white mb-2 w-100';
 
         el.innerHTML = `
@@ -650,7 +660,24 @@
         `;
         content.appendChild(el);
       });
+
+      const today = new Date().toISOString().split('T')[0];
+      const upcomingPlan = plans.find(p => p.startDate >= today);
+
+      if (upcomingPlan) {
+        const element = document.getElementById(
+          `travel-plan-${upcomingPlan.id}`
+        );
+
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      }
     }
+
     function addTravel() {
       const title = document.getElementById('title').value;
       const place = document.getElementById('place').value;
@@ -694,43 +721,92 @@
         save('');
       }
     }
+
     function editTravel(id) {
       const plans = getPlans();
       const plan = plans.find(p => p.id === id);
+
+      if (!plan) return;
+
+      state.editPlanId = id;
 
       openModalFromTemplate('travel-form-template');
 
       document.getElementById('title').value = plan.title;
       document.getElementById('place').value = plan.place;
-      document.getElementById('time').value = plan.time;
+      document.getElementById('time').value = plan.time || '';
       document.getElementById('startDate').value = plan.startDate;
       document.getElementById('endDate').value = plan.endDate || '';
 
-      state.editPlanId = id;
+      const multiple = !!plan.endDate;
+      document.querySelector(
+        `input[name="dayType"][value="${multiple ? 'multiple' : 'single'}"]`
+      ).checked = true;
+
+      toggleEndDate();
+
+      if (plan.image) {
+        const imageContainer = document.getElementById('currentImageContainer');
+        const image = document.getElementById('currentImage');
+
+        image.src = plan.image;
+        imageContainer.classList.remove('d-none');
+      }
+
+      const saveButton = document.getElementById('travelSaveBtn');
+      saveButton.textContent = 'Save Changes';
+      saveButton.onclick = saveEdit;
     }
+
     function saveEdit() {
       const plans = getPlans();
-
       const plan = plans.find(p => p.id === state.editPlanId);
 
-      plan.title = document.getElementById('title').value;
-      plan.place = document.getElementById('place').value;
-      plan.time = document.getElementById('time').value;
-      plan.startDate = document.getElementById('startDate').value;
-      plan.endDate = document.getElementById('endDate').value || null;
+      if (!plan) return;
 
-      savePlans(plans);
-      state.editPlanId = null;
-      closeModal();
-      renderTravels();
+      const title = document.getElementById('title').value;
+      const place = document.getElementById('place').value;
+      const time = document.getElementById('time').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value || null;
+      const file = document.getElementById('travelImage').files[0];
+
+      if (!title || !place || !startDate) {
+        alert('Please fill in the required fields.');
+        return;
+      }
+
+      plan.title = title;
+      plan.place = place;
+      plan.time = time;
+      plan.startDate = startDate;
+      plan.endDate = endDate;
+
+      if (file) {
+        const reader = new FileReader();
+
+        reader.onload = function () {
+          plan.image = reader.result;
+
+          savePlans(plans);
+          state.editPlanId = null;
+          closeModal();
+          renderTravels();
+        };
+
+        reader.readAsDataURL(file);
+      } else {
+        savePlans(plans);
+        state.editPlanId = null;
+        closeModal();
+        renderTravels();
+      }
     }
 
     function toggleEndDate() {
       const multi = document.querySelector('input[name="dayType"]:checked').value === 'multiple';
       document.getElementById('endDate').classList.toggle('d-none', !multi);
     }
-
-
 
     // Settings
     function renderSettings() {
