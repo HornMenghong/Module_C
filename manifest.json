@@ -1,6 +1,7 @@
 {
   "name": "Lyon Web Services",
   "short_name": "LyonServices",
+  "description": "Lyon Mobile Web Services application",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
